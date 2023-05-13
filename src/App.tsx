@@ -1,97 +1,69 @@
 import { useState } from "react";
 
-interface Rectangle {
-  type: "rectangle";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-interface Ellipse {
-  type: "ellipse";
-  cx: number;
-  cy: number;
-  rx: number;
-  ry: number;
-}
 interface Drawable {
+  tool: string;
   startX: number;
   startY: number;
   endX: number;
   endY: number;
 }
-function drawRect(rect: Rectangle) {
-  return (
-    <rect
-      className="fill-emerald-500"
-      x={rect.x}
-      y={rect.y}
-      width={rect.width}
-      height={rect.height}
-    />
-  );
-}
-
-function drawableToRectangle({
-  startX,
-  startY,
-  endX,
-  endY,
-}: Drawable): Rectangle | null {
-  if (startX === endX || startY == endY) return null;
-  return {
-    type: "rectangle",
-    x: startX < endX ? startX : endX,
-    y: startY < endY ? startY : endY,
-    width: startX < endX ? endX - startX : startX - endX,
-    height: startY < endY ? endY - startY : startY - endY,
-  };
-}
-function drawEllipse({ cx, cy, rx, ry }: Ellipse) {
-  return (
-    <ellipse className="fill-emerald-500" cx={cx} cy={cy} rx={rx} ry={ry} />
-  );
-}
-function drawableToEllipse({
-  startX,
-  startY,
-  endX,
-  endY,
-}: Drawable): Ellipse | null {
-  if (startX === endX || startY == endY) return null;
-
-  const rx = (startX < endX ? endX - startX : startX - endX) / 2;
-  const ry = (startY < endY ? endY - startY : startY - endY) / 2;
-  return {
-    type: "ellipse",
-    rx: rx,
-    ry: ry,
-    cx: (startX < endX ? startX : endX) + rx,
-    cy: (startY < endY ? startY : endY) + ry,
-  };
-}
 
 function App() {
   const [tool, setTool] = useState("rectangle");
-  const [content, setContent] = useState<(Rectangle | Ellipse)[]>([]);
+  const [content, setContent] = useState<Drawable[]>([]);
   const [overlay, setOverlay] = useState<Drawable | null>(null);
 
-  const functions: {
-    [key: string]: (d: Drawable) => Rectangle | Ellipse | null;
-  } = {
-    rectangle: drawableToRectangle,
-    ellipse: drawableToEllipse,
+  const functions3: { [key: string]: (d: Drawable) => JSX.Element } = {
+    rectangle: ({ startX, startY, endX, endY }) => {
+      const x = startX < endX ? startX : endX;
+      const y = startY < endY ? startY : endY;
+      const w = startX < endX ? endX - startX : startX - endX;
+      const h = startY < endY ? endY - startY : startY - endY;
+
+      return (
+        <rect className="fill-emerald-500" x={x} y={y} width={w} height={h} />
+      );
+    },
+    circle: ({ startX, startY, endX, endY }) => {
+      const rx = (startX < endX ? endX - startX : startX - endX) / 2;
+      const ry = (startY < endY ? endY - startY : startY - endY) / 2;
+      const r = Math.max(rx, ry);
+      const cx = (startX < endX ? startX : endX) + r;
+      const cy = (startY < endY ? startY : endY) + r;
+
+      return <circle className="fill-emerald-500" cx={cx} cy={cy} r={r} />;
+    },
+    ellipse: ({ startX, startY, endX, endY }) => {
+      const rx = (startX < endX ? endX - startX : startX - endX) / 2;
+      const ry = (startY < endY ? endY - startY : startY - endY) / 2;
+      const cx = (startX < endX ? startX : endX) + rx;
+      const cy = (startY < endY ? startY : endY) + ry;
+
+      return (
+        <ellipse className="fill-emerald-500" cx={cx} cy={cy} rx={rx} ry={ry} />
+      );
+    },
+    line: ({ startX, startY, endX, endY }) => {
+      const x1 = startX;
+      const y1 = startY;
+      const x2 = endX;
+      const y2 = endY;
+
+      return (
+        <line
+          className="stroke-emerald-500 stroke-1"
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+        />
+      );
+    },
   };
-  const functions2: {
-    [key: string]: (d: any) => JSX.Element;
-  } = {
-    rectangle: drawRect,
-    ellipse: drawEllipse,
-  };
-  const drawing = overlay ? functions[tool](overlay) : null;
 
   const onPaneMouseDown: React.MouseEventHandler<SVGSVGElement> = (e) => {
     setOverlay({
+      tool: tool,
       startX: e.nativeEvent.offsetX,
       startY: e.nativeEvent.offsetY,
       endX: e.nativeEvent.offsetX,
@@ -117,8 +89,9 @@ function App() {
   const onPaneMouseUp: React.MouseEventHandler<SVGSVGElement> = (e) => {
     if (!overlay) return;
 
-    if (drawing) {
-      setContent([...content, drawing]);
+    const { startX, startY, endX, endY } = overlay;
+    if (startX !== endX && startY !== endY) {
+      setContent([...content, overlay]);
     }
     setOverlay(null);
 
@@ -159,8 +132,8 @@ function App() {
           onMouseMove={onPaneMouseMove}
           onMouseUp={onPaneMouseUp}
         >
-          <g>{content.map((element) => functions2[element.type](element))}</g>
-          <g>{drawing ? functions2[drawing.type](drawing) : null}</g>
+          <g>{content.map((element) => functions3[element.tool](element))}</g>
+          <g>{overlay ? functions3[overlay.tool](overlay) : null}</g>
         </svg>
         <p>{tool}</p>
       </main>
