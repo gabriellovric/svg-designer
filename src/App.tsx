@@ -1,55 +1,129 @@
 import { useState } from "react";
 
 interface Rectangle {
-  type: "rect";
+  type: "rectangle";
   x: number;
   y: number;
   width: number;
   height: number;
 }
+interface Ellipse {
+  type: "ellipse";
+  cx: number;
+  cy: number;
+  rx: number;
+  ry: number;
+}
+interface Drawable {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}
 function drawRect(rect: Rectangle) {
   return (
     <rect
       className="fill-emerald-500"
-      x={rect.width < 0 ? rect.x + rect.width : rect.x}
-      y={rect.height < 0 ? rect.y + rect.height : rect.y}
-      width={Math.abs(rect.width)}
-      height={Math.abs(rect.height)}
+      x={rect.x}
+      y={rect.y}
+      width={rect.width}
+      height={rect.height}
     />
   );
 }
 
+function drawableToRectangle({
+  startX,
+  startY,
+  endX,
+  endY,
+}: Drawable): Rectangle | null {
+  if (startX === endX || startY == endY) return null;
+  return {
+    type: "rectangle",
+    x: startX < endX ? startX : endX,
+    y: startY < endY ? startY : endY,
+    width: startX < endX ? endX - startX : startX - endX,
+    height: startY < endY ? endY - startY : startY - endY,
+  };
+}
+function drawEllipse({ cx, cy, rx, ry }: Ellipse) {
+  return (
+    <ellipse className="fill-emerald-500" cx={cx} cy={cy} rx={rx} ry={ry} />
+  );
+}
+function drawableToEllipse({
+  startX,
+  startY,
+  endX,
+  endY,
+}: Drawable): Ellipse | null {
+  if (startX === endX || startY == endY) return null;
+
+  const rx = (startX < endX ? endX - startX : startX - endX) / 2;
+  const ry = (startY < endY ? endY - startY : startY - endY) / 2;
+  return {
+    type: "ellipse",
+    rx: rx,
+    ry: ry,
+    cx: (startX < endX ? startX : endX) + rx,
+    cy: (startY < endY ? startY : endY) + ry,
+  };
+}
+
 function App() {
   const [tool, setTool] = useState("rectangle");
-  const [content, setContent] = useState<Rectangle[]>([]);
-  const [overlay, setOverlay] = useState<Rectangle | null>(null);
+  const [content, setContent] = useState<(Rectangle | Ellipse)[]>([]);
+  const [overlay, setOverlay] = useState<Drawable | null>(null);
+
+  const functions: {
+    [key: string]: (d: Drawable) => Rectangle | Ellipse | null;
+  } = {
+    rectangle: drawableToRectangle,
+    ellipse: drawableToEllipse,
+  };
+  const functions2: {
+    [key: string]: (d: any) => JSX.Element;
+  } = {
+    rectangle: drawRect,
+    ellipse: drawEllipse,
+  };
+  const drawing = overlay ? functions[tool](overlay) : null;
 
   const onPaneMouseDown: React.MouseEventHandler<SVGSVGElement> = (e) => {
     setOverlay({
-      type: "rect",
-      x: e.nativeEvent.offsetX,
-      y: e.nativeEvent.offsetY,
-      width: 0,
-      height: 0,
+      startX: e.nativeEvent.offsetX,
+      startY: e.nativeEvent.offsetY,
+      endX: e.nativeEvent.offsetX,
+      endY: e.nativeEvent.offsetY,
     });
+
+    e.stopPropagation();
+    e.preventDefault();
   };
 
   const onPaneMouseMove: React.MouseEventHandler<SVGSVGElement> = (e) => {
     if (!overlay) return;
-    const [width, height] = [
-      e.nativeEvent.offsetX - overlay.x,
-      e.nativeEvent.offsetY - overlay.y,
-    ];
-    setOverlay({ ...overlay, width: width, height: height });
+    setOverlay({
+      ...overlay,
+      endX: e.nativeEvent.offsetX,
+      endY: e.nativeEvent.offsetY,
+    });
+
+    e.stopPropagation();
+    e.preventDefault();
   };
 
   const onPaneMouseUp: React.MouseEventHandler<SVGSVGElement> = (e) => {
     if (!overlay) return;
 
-    if (overlay.width !== 0 && overlay.height !== 0) {
-      setContent([...content, overlay]);
+    if (drawing) {
+      setContent([...content, drawing]);
     }
     setOverlay(null);
+
+    e.stopPropagation();
+    e.preventDefault();
   };
 
   return (
@@ -85,8 +159,8 @@ function App() {
           onMouseMove={onPaneMouseMove}
           onMouseUp={onPaneMouseUp}
         >
-          <g>{content.map((element) => drawRect(element))}</g>
-          <g>{overlay ? drawRect(overlay) : null}</g>
+          <g>{content.map((element) => functions2[element.type](element))}</g>
+          <g>{drawing ? functions2[drawing.type](drawing) : null}</g>
         </svg>
         <p>{tool}</p>
       </main>
