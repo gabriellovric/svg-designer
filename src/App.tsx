@@ -6,14 +6,15 @@ interface Drawable {
   startY: number;
   endX: number;
   endY: number;
+  // points: [number, number][];
 }
 
 function App() {
   const [tool, setTool] = useState("rectangle");
   const [content, setContent] = useState<Drawable[]>([]);
-  const [overlay, setOverlay] = useState<Drawable | null>(null);
+  const [activeShape, setActiveShape] = useState<Drawable | null>(null);
 
-  const functions3: { [key: string]: (d: Drawable) => JSX.Element } = {
+  const renderFunctions: { [key: string]: (d: Drawable) => JSX.Element } = {
     rectangle: ({ startX, startY, endX, endY }) => {
       const x = startX < endX ? startX : endX;
       const y = startY < endY ? startY : endY;
@@ -59,10 +60,23 @@ function App() {
         />
       );
     },
+    polyline: ({ startX, startY, endX, endY }) => {
+      const x1 = startX;
+      const y1 = startY;
+      const x2 = endX;
+      const y2 = endY;
+
+      return (
+        <polyline
+          className="stroke-emerald-500 stroke-1"
+          points={`${x1},${y1} ${x2},${y2}`}
+        />
+      );
+    },
   };
 
   const onPaneMouseDown: React.MouseEventHandler<SVGSVGElement> = (e) => {
-    setOverlay({
+    setActiveShape({
       tool: tool,
       startX: e.nativeEvent.offsetX,
       startY: e.nativeEvent.offsetY,
@@ -75,9 +89,9 @@ function App() {
   };
 
   const onPaneMouseMove: React.MouseEventHandler<SVGSVGElement> = (e) => {
-    if (!overlay) return;
-    setOverlay({
-      ...overlay,
+    if (!activeShape) return;
+    setActiveShape({
+      ...activeShape,
       endX: e.nativeEvent.offsetX,
       endY: e.nativeEvent.offsetY,
     });
@@ -87,13 +101,13 @@ function App() {
   };
 
   const onPaneMouseUp: React.MouseEventHandler<SVGSVGElement> = (e) => {
-    if (!overlay) return;
+    if (!activeShape) return;
 
-    const { startX, startY, endX, endY } = overlay;
+    const { startX, startY, endX, endY } = activeShape;
     if (startX !== endX && startY !== endY) {
-      setContent([...content, overlay]);
+      setContent([...content, activeShape]);
     }
-    setOverlay(null);
+    setActiveShape(null);
 
     e.stopPropagation();
     e.preventDefault();
@@ -132,8 +146,14 @@ function App() {
           onMouseMove={onPaneMouseMove}
           onMouseUp={onPaneMouseUp}
         >
-          <g>{content.map((element) => functions3[element.tool](element))}</g>
-          <g>{overlay ? functions3[overlay.tool](overlay) : null}</g>
+          <g>
+            {content.map((element) => renderFunctions[element.tool](element))}
+          </g>
+          <g>
+            {activeShape
+              ? renderFunctions[activeShape.tool](activeShape)
+              : null}
+          </g>
         </svg>
         <p>{tool}</p>
       </main>
